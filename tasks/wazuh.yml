@@ -1,0 +1,41 @@
+---
+# Wazuh integration deploys a custom Python script to the Wazuh manager.
+# This requires the target host to also be (or have access to) the Wazuh manager.
+
+- name: Install thehive4py for Wazuh integration
+  ansible.builtin.pip:
+    name: thehive4py>=2.0.0
+    state: present
+
+- name: Deploy Wazuh-TheHive integration script
+  ansible.builtin.template:
+    src: custom-w2thive.py.j2
+    dest: /var/ossec/integrations/custom-w2thive.py
+    owner: root
+    group: wazuh
+    mode: "0750"
+  when: ludus_thehive_wazuh_enabled
+
+- name: Deploy Wazuh-TheHive integration wrapper
+  ansible.builtin.copy:
+    dest: /var/ossec/integrations/custom-w2thive
+    content: |
+      #!/bin/sh
+      /var/ossec/framework/python/bin/python3 /var/ossec/integrations/custom-w2thive.py "$@"
+    owner: root
+    group: wazuh
+    mode: "0750"
+  when: ludus_thehive_wazuh_enabled
+
+- name: Display Wazuh integration info
+  ansible.builtin.debug:
+    msg:
+      - "Wazuh integration script deployed to /var/ossec/integrations/custom-w2thive.py"
+      - "Add the following to your Wazuh manager ossec.conf:"
+      - "  <integration>"
+      - "    <name>custom-w2thive</name>"
+      - "    <hook_url>{{ ludus_thehive_wazuh_thehive_url }}</hook_url>"
+      - "    <api_key>{{ ludus_thehive_wazuh_api_key }}</api_key>"
+      - "    <alert_format>json</alert_format>"
+      - "    <level>{{ ludus_thehive_wazuh_alert_level }}</level>"
+      - "  </integration>"

@@ -1,0 +1,15 @@
+---
+- name: restart cassandra
+  ansible.builtin.service:
+    name: cassandra
+    state: restarted
+
+- name: restart elasticsearch
+  ansible.builtin.service:
+    name: elasticsearch
+    state: restarted
+
+- name: restart thehive
+  ansible.builtin.service:
+    name: thehive
+    state: restarted

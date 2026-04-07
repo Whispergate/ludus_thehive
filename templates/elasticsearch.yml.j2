@@ -1,0 +1,13 @@
+# Elasticsearch configuration - managed by Ansible
+# Do not edit manually
+
+cluster.name: thehive
+node.name: node-1
+network.host: {{ ludus_thehive_elasticsearch_host }}
+http.port: {{ ludus_thehive_elasticsearch_port }}
+discovery.type: single-node
+cluster.initial_master_nodes: ["node-1"]
+xpack.security.enabled: false
+thread_pool.search.queue_size: 100000
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch

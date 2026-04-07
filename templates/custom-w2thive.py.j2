@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+# Wazuh-TheHive integration script - managed by Ansible
+# Deployed to /var/ossec/integrations/custom-w2thive.py
+
+import json
+import sys
+import os
+import time
+
+try:
+    from thehive4py.api import TheHiveApi
+    from thehive4py.models import Alert, AlertArtifact
+except ImportError:
+    # thehive4py v2+ uses different import paths
+    from thehive4py import TheHiveApi
+    from thehive4py.types.alert import InputAlert
+
+THEHIVE_URL = "{{ ludus_thehive_wazuh_thehive_url }}"
+THEHIVE_API_KEY = "{{ ludus_thehive_wazuh_api_key }}"
+ALERT_LEVEL = {{ ludus_thehive_wazuh_alert_level }}
+
+# Severity mapping: Wazuh levels to TheHive severity (1=Low, 2=Medium, 3=High, 4=Critical)
+def get_severity(level):
+    if level <= 4:
+        return 1  # Low
+    elif level <= 7:
+        return 2  # Medium
+    elif level <= 11:
+        return 3  # High
+    else:
+        return 4  # Critical
+
+
+def main():
+    # Read alert file path from arguments
+    alert_file = open(sys.argv[1])
+    alert_json = json.loads(alert_file.read())
+    alert_file.close()
+
+    alert_level = alert_json.get("rule", {}).get("level", 0)
+    if alert_level < ALERT_LEVEL:
+        sys.exit(0)
+
+    # Build alert details
+    rule = alert_json.get("rule", {})
+    agent = alert_json.get("agent", {})
+    source = alert_json.get("data", {}).get("srcip", "unknown")
+    title = f"Wazuh Alert: {rule.get('description', 'No description')} (Level {alert_level})"
+
+    description = (
+        f"**Rule:** {rule.get('id', 'N/A')} - {rule.get('description', 'N/A')}\n"
+        f"**Level:** {alert_level}\n"
+        f"**Agent:** {agent.get('name', 'N/A')} ({agent.get('id', 'N/A')})\n"
+        f"**Timestamp:** {alert_json.get('timestamp', 'N/A')}\n"
+        f"**Full Log:** {alert_json.get('full_log', 'N/A')}\n"
+    )
+
+    # Create TheHive alert
+    api = TheHiveApi(THEHIVE_URL, THEHIVE_API_KEY)
+
+    alert = Alert(
+        title=title,
+        tlp=2,
+        severity=get_severity(alert_level),
+        description=description,
+        type="wazuh",
+        source="Wazuh",
+        sourceRef=f"wazuh-{rule.get('id', '0')}-{str(int(time.time()))}",
+        tags=["wazuh", f"level:{alert_level}", f"rule:{rule.get('id', '0')}"],
+    )
+
+    response = api.create_alert(alert)
+    if response.status_code == 201:
+        print(f"Alert created successfully: {title}")
+    else:
+        print(f"Failed to create alert: {response.status_code} - {response.text}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

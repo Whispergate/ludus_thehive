@@ -1,0 +1,47 @@
+---
+- name: Validate OS family
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+    fail_msg: "This role only supports Debian/Ubuntu systems. Detected: {{ ansible_os_family }}"
+
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - software-properties-common
+      - python3-pip
+    state: present
+    update_cache: true
+
+- name: Install Java 11 (Amazon Corretto)
+  ansible.builtin.include_tasks: java.yml
+
+- name: Install and configure Cassandra
+  ansible.builtin.include_tasks: cassandra.yml
+
+- name: Install and configure Elasticsearch
+  ansible.builtin.include_tasks: elasticsearch.yml
+
+- name: Install and configure TheHive
+  ansible.builtin.include_tasks: thehive.yml
+
+- name: Configure MISP integration
+  ansible.builtin.include_tasks: misp.yml
+  when: ludus_thehive_misp_enabled
+
+- name: Configure Wazuh integration
+  ansible.builtin.include_tasks: wazuh.yml
+  when: ludus_thehive_wazuh_enabled
+
+- name: Display TheHive access information
+  ansible.builtin.debug:
+    msg:
+      - "TheHive is available at http://{{ ansible_default_ipv4.address }}:{{ ludus_thehive_port }}"
+      - "Default credentials: admin@thehive.local / secret"
+      - "MISP integration: {{ 'enabled' if ludus_thehive_misp_enabled else 'disabled' }}"
+      - "Wazuh integration: {{ 'enabled' if ludus_thehive_wazuh_enabled else 'disabled' }}"
+      - "OpenCTI integration: {{ 'enabled (configure connector on OpenCTI side)' if ludus_thehive_opencti_enabled else 'disabled' }}"

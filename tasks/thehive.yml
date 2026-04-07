@@ -1,0 +1,57 @@
+---
+- name: Add TheHive GPG key
+  ansible.builtin.get_url:
+    url: https://archives.strangebee.com/keys/strangebee.gpg
+    dest: /usr/share/keyrings/strangebee-keyring.gpg
+    mode: "0644"
+
+- name: Add TheHive repository
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/strangebee-keyring.gpg] https://deb.strangebee.com thehive-5.4 main"
+    filename: strangebee
+    state: present
+
+- name: Install TheHive
+  ansible.builtin.apt:
+    name: "thehive={{ ludus_thehive_version }}"
+    state: present
+    update_cache: true
+
+- name: Create TheHive file storage directory
+  ansible.builtin.file:
+    path: "{{ ludus_thehive_storage_local_path }}"
+    state: directory
+    owner: thehive
+    group: thehive
+    mode: "0750"
+  when: ludus_thehive_storage_type == "local"
+
+- name: Deploy TheHive configuration
+  ansible.builtin.template:
+    src: application.conf.j2
+    dest: /etc/thehive/application.conf
+    owner: thehive
+    group: thehive
+    mode: "0640"
+    backup: true
+  notify: restart thehive
+
+- name: Enable and start TheHive
+  ansible.builtin.service:
+    name: thehive
+    state: started
+    enabled: true
+
+- name: Flush handlers to restart TheHive if needed
+  ansible.builtin.meta: flush_handlers
+
+- name: Wait for TheHive to be ready
+  ansible.builtin.uri:
+    url: "http://127.0.0.1:{{ ludus_thehive_port }}/api/v1/status/public"
+    method: GET
+    status_code: 200
+  register: thehive_status
+  retries: 30
+  delay: 10
+  until: thehive_status.status == 200
+  failed_when: false

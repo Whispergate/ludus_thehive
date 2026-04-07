@@ -1,0 +1,109 @@
+---
+# ========================
+# TheHive Configuration
+# ========================
+
+# TheHive version to install
+ludus_thehive_version: "5.4.5-1"
+
+# TheHive HTTP port
+ludus_thehive_port: 9000
+
+# TheHive organization name (created on first boot)
+ludus_thehive_org_name: "default"
+
+# Secret key for TheHive (auto-generated if empty)
+ludus_thehive_secret: ""
+
+# ========================
+# Cassandra Configuration
+# ========================
+
+ludus_thehive_cassandra_version: "4.1"
+ludus_thehive_cassandra_listen_address: "127.0.0.1"
+ludus_thehive_cassandra_rpc_address: "127.0.0.1"
+ludus_thehive_cassandra_cluster_name: "thp"
+ludus_thehive_cassandra_keyspace: "thehive"
+ludus_thehive_cassandra_replication_factor: 1
+
+# Cassandra authentication
+ludus_thehive_cassandra_admin_password: "cassandra"
+ludus_thehive_cassandra_thehive_user: "thehive"
+ludus_thehive_cassandra_thehive_password: "thehive"
+
+# ========================
+# Elasticsearch Configuration
+# ========================
+
+ludus_thehive_elasticsearch_version: "7.17"
+ludus_thehive_elasticsearch_host: "127.0.0.1"
+ludus_thehive_elasticsearch_port: 9200
+ludus_thehive_elasticsearch_index: "thehive"
+
+# JVM heap size (recommended: 50% of RAM, max 31g)
+ludus_thehive_elasticsearch_heap_size: "1g"
+
+# ========================
+# File Storage
+# ========================
+
+# Options: "local" or "s3"
+ludus_thehive_storage_type: "local"
+ludus_thehive_storage_local_path: "/opt/thp/thehive/files"
+
+# S3/MinIO settings (only used when storage_type is "s3")
+ludus_thehive_storage_s3_endpoint: "http://127.0.0.1:9100"
+ludus_thehive_storage_s3_bucket: "thehive"
+ludus_thehive_storage_s3_access_key: "minioadmin"
+ludus_thehive_storage_s3_secret_key: "minioadmin"
+
+# ========================
+# Cortex Integration
+# ========================
+
+ludus_thehive_cortex_enabled: false
+ludus_thehive_cortex_url: "http://127.0.0.1:9001"
+ludus_thehive_cortex_api_key: ""
+
+# ========================
+# MISP Integration
+# ========================
+
+ludus_thehive_misp_enabled: false
+# List of MISP servers to connect
+# ludus_thehive_misp_servers:
+#   - name: "MISP"
+#     url: "https://misp.example.com"
+#     auth_key: "your-misp-api-key"
+#     # Optional settings per server
+#     organisation: "default"
+#     max_age_days: 7
+#     exclude_organisations: []
+#     exclude_tags: []
+#     include_tags: []  # empty = all tags
+#     purpose: "ImportAndExport"  # ImportOnly, ExportOnly, ImportAndExport
+#     case_template: ""
+#     ws_ssl_verify: true
+ludus_thehive_misp_servers: []
+
+# ========================
+# Wazuh Integration
+# ========================
+
+# Wazuh integration is configured on the Wazuh manager side.
+# These variables are used to generate the custom integration script.
+ludus_thehive_wazuh_enabled: false
+ludus_thehive_wazuh_alert_level: 6
+ludus_thehive_wazuh_api_key: ""
+# TheHive URL as seen from the Wazuh manager
+ludus_thehive_wazuh_thehive_url: "http://{{ ansible_default_ipv4.address }}:{{ ludus_thehive_port }}"
+
+# ========================
+# OpenCTI Integration
+# ========================
+
+# OpenCTI connects to TheHive via its own connector.
+# These variables configure TheHive to accept connections from OpenCTI.
+ludus_thehive_opencti_enabled: false
+# API key for the OpenCTI service account in TheHive
+ludus_thehive_opencti_api_key: ""

@@ -1,0 +1,30 @@
+---
+dependencies: []
+
+galaxy_info:
+  role_name: ludus_thehive
+  author: Whispergate
+  description: An Ansible Role that installs TheHive 5 on Debian/Ubuntu with Cassandra, Elasticsearch, and optional MISP/Wazuh/OpenCTI integrations
+  company: ""
+  license: MIT
+  min_ansible_version: "2.10"
+  platforms:
+    - name: Debian
+      versions:
+        - bullseye
+        - bookworm
+    - name: Ubuntu
+      versions:
+        - focal
+        - jammy
+  galaxy_tags:
+    - thehive
+    - security
+    - incident-response
+    - siem
+    - misp
+    - wazuh
+    - opencti
+    - ludus
+
+collections: []
