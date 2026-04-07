@@ -76,8 +76,8 @@
     timeout: 120
 
 - name: Install Python Cassandra driver for cqlsh operations
-  ansible.builtin.pip:
-    name: cassandra-driver
+  ansible.builtin.apt:
+    name: python3-cassandra
     state: present
 
 - name: Wait for Cassandra default superuser to be ready
