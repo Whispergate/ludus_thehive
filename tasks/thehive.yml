@@ -1,21 +1,20 @@
 ---
-- name: Add TheHive GPG key
+- name: Download TheHive GPG key
   ansible.builtin.get_url:
-    url: https://archives.strangebee.com/keys/strangebee.gpg
+    url: https://keys.download.strangebee.com/latest/gpg/strangebee.gpg
     dest: /usr/share/keyrings/strangebee-keyring.gpg
     mode: "0644"
 
-- name: Add TheHive repository
-  ansible.builtin.apt_repository:
-    repo: "deb [signed-by=/usr/share/keyrings/strangebee-keyring.gpg] https://deb.strangebee.com thehive-5.4 main"
-    filename: strangebee
-    state: present
+- name: Download TheHive deb package
+  ansible.builtin.get_url:
+    url: "https://thehive.download.strangebee.com/{{ ludus_thehive_version_branch }}/deb/thehive_{{ ludus_thehive_version }}_all.deb"
+    dest: "/tmp/thehive_{{ ludus_thehive_version }}_all.deb"
+    mode: "0644"
 
-- name: Install TheHive
+- name: Install TheHive deb package
   ansible.builtin.apt:
-    name: "thehive={{ ludus_thehive_version }}"
+    deb: "/tmp/thehive_{{ ludus_thehive_version }}_all.deb"
     state: present
-    update_cache: true
 
 - name: Create TheHive file storage directory
   ansible.builtin.file:
