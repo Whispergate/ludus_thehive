@@ -35,7 +35,7 @@ ludus_thehive_cassandra_thehive_password: "thehive"
 # Elasticsearch Configuration
 # ========================
 
-ludus_thehive_elasticsearch_version: "7.17"
+ludus_thehive_elasticsearch_version: "7.x"
 ludus_thehive_elasticsearch_host: "127.0.0.1"
 ludus_thehive_elasticsearch_port: 9200
 ludus_thehive_elasticsearch_index: "thehive"
