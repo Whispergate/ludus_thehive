@@ -17,6 +17,32 @@
     state: present
     update_cache: true
 
+- name: Stop Cassandra before reconfiguration
+  ansible.builtin.service:
+    name: cassandra
+    state: stopped
+
+- name: Wipe Cassandra data directory for clean reconfiguration
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /var/lib/cassandra/data
+    - /var/lib/cassandra/commitlog
+    - /var/lib/cassandra/saved_caches
+
+- name: Recreate Cassandra data directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: cassandra
+    group: cassandra
+    mode: "0750"
+  loop:
+    - /var/lib/cassandra/data
+    - /var/lib/cassandra/commitlog
+    - /var/lib/cassandra/saved_caches
+
 - name: Configure Cassandra cluster name
   ansible.builtin.lineinfile:
     path: /etc/cassandra/cassandra.yaml
@@ -72,8 +98,8 @@
   ansible.builtin.wait_for:
     port: 9042
     host: "{{ ludus_thehive_cassandra_listen_address }}"
-    delay: 10
-    timeout: 120
+    delay: 15
+    timeout: 300
 
 - name: Install Python Cassandra driver for cqlsh operations
   ansible.builtin.apt:
