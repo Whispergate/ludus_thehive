@@ -43,63 +43,56 @@
     - /var/lib/cassandra/commitlog
     - /var/lib/cassandra/saved_caches
 
-- name: Configure Cassandra cluster name
-  ansible.builtin.lineinfile:
-    path: /etc/cassandra/cassandra.yaml
-    regexp: "^cluster_name:"
-    line: "cluster_name: '{{ ludus_thehive_cassandra_cluster_name }}'"
-  notify: restart cassandra
+- name: Deploy Cassandra configuration
+  ansible.builtin.template:
+    src: cassandra.yaml.j2
+    dest: /etc/cassandra/cassandra.yaml
+    owner: cassandra
+    group: cassandra
+    mode: "0644"
+    backup: true
 
-- name: Configure Cassandra listen address
-  ansible.builtin.lineinfile:
-    path: /etc/cassandra/cassandra.yaml
-    regexp: "^listen_address:"
-    line: "listen_address: {{ ludus_thehive_cassandra_listen_address }}"
-  notify: restart cassandra
-
-- name: Configure Cassandra RPC address
-  ansible.builtin.lineinfile:
-    path: /etc/cassandra/cassandra.yaml
-    regexp: "^rpc_address:"
-    line: "rpc_address: {{ ludus_thehive_cassandra_rpc_address }}"
-  notify: restart cassandra
-
-- name: Configure Cassandra seeds
-  ansible.builtin.lineinfile:
-    path: /etc/cassandra/cassandra.yaml
-    regexp: '^\s+- seeds:'
-    line: '          - seeds: "{{ ludus_thehive_cassandra_listen_address }}"'
-  notify: restart cassandra
-
-- name: Enable Cassandra password authentication
-  ansible.builtin.lineinfile:
-    path: /etc/cassandra/cassandra.yaml
-    regexp: "^authenticator:"
-    line: "authenticator: PasswordAuthenticator"
-  notify: restart cassandra
-
-- name: Enable Cassandra authorizer
-  ansible.builtin.lineinfile:
-    path: /etc/cassandra/cassandra.yaml
-    regexp: "^authorizer:"
-    line: "authorizer: CassandraAuthorizer"
-  notify: restart cassandra
-
-- name: Enable and start Cassandra
+- name: Start and enable Cassandra
   ansible.builtin.service:
     name: cassandra
     state: started
     enabled: true
+  register: cassandra_start
+  ignore_errors: true
 
-- name: Flush handlers to restart Cassandra if needed
-  ansible.builtin.meta: flush_handlers
+- name: Gather Cassandra logs if start failed
+  when: cassandra_start is failed
+  block:
+    - name: Get systemctl status for Cassandra
+      ansible.builtin.command: systemctl status cassandra --no-pager
+      register: cassandra_status
+      changed_when: false
+      failed_when: false
 
-- name: Wait for Cassandra to be ready
+    - name: Get journalctl output for Cassandra
+      ansible.builtin.command: journalctl -u cassandra --no-pager -n 100
+      register: cassandra_journal
+      changed_when: false
+      failed_when: false
+
+    - name: Display Cassandra failure diagnostics
+      ansible.builtin.debug:
+        msg:
+          - "=== systemctl status ==="
+          - "{{ cassandra_status.stdout_lines | default([]) }}"
+          - "=== journalctl ==="
+          - "{{ cassandra_journal.stdout_lines | default([]) }}"
+
+    - name: Fail with Cassandra start error
+      ansible.builtin.fail:
+        msg: "Cassandra failed to start. See diagnostics above."
+
+- name: Wait for Cassandra CQL port to be ready
   ansible.builtin.wait_for:
     port: 9042
     host: "{{ ludus_thehive_cassandra_listen_address }}"
     delay: 15
-    timeout: 300
+    timeout: 600
 
 - name: Install Python Cassandra driver for cqlsh operations
   ansible.builtin.apt:
