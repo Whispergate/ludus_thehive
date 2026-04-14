@@ -29,6 +29,25 @@ ludus_thehive_enable_nginx: true
 ludus_thehive_server_name: "thehive.local"
 
 # ========================
+# Resource tuning (for Ludus-sized VMs)
+# ========================
+# Defaults are sized for an 8 GB VM. The upstream StrangeBee compose targets
+# ~13 GB — these overrides shrink heaps and container memory limits so the
+# stack actually fits. Bump up if you have more RAM available.
+
+ludus_thehive_small_resources: true
+
+ludus_thehive_cassandra_heap_size: "1500M"
+ludus_thehive_cassandra_heap_newsize: "256M"
+ludus_thehive_cassandra_memory_limit: "2G"
+
+ludus_thehive_elasticsearch_heap: "1500m"
+ludus_thehive_elasticsearch_memory_limit: "2G"
+
+ludus_thehive_java_heap: "1500M"
+ludus_thehive_memory_limit: "2G"
+
+# ========================
 # Credentials
 # ========================
 

@@ -95,29 +95,85 @@
   when: ludus_thehive_enable_nginx
   changed_when: false
 
-- name: Disable nginx service in compose (when nginx not wanted)
-  ansible.builtin.copy:
+- name: Deploy docker-compose resource override
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
     dest: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/docker-compose.override.yml"
-    content: |
-      services:
-        nginx:
-          profiles:
-            - disabled
     mode: "0644"
-  when: not ludus_thehive_enable_nginx
+  when: ludus_thehive_small_resources
 
-- name: Remove compose override when nginx is enabled
+- name: Remove compose override when small_resources is disabled
   ansible.builtin.file:
     path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/docker-compose.override.yml"
     state: absent
-  when: ludus_thehive_enable_nginx
+  when: not ludus_thehive_small_resources
 
 - name: Start TheHive stack with docker compose
   ansible.builtin.command:
-    cmd: docker compose up -d
+    cmd: docker compose up -d --wait --wait-timeout 600
     chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
   register: compose_up
   changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout or 'Recreated' in compose_up.stdout"
+  ignore_errors: true
+
+- name: Gather diagnostics if compose up failed
+  when: compose_up is failed
+  block:
+    - name: Get compose ps
+      ansible.builtin.command:
+        cmd: docker compose ps
+        chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+      register: compose_ps
+      changed_when: false
+      failed_when: false
+
+    - name: Get elasticsearch logs
+      ansible.builtin.command:
+        cmd: docker compose logs --tail=100 elasticsearch
+        chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+      register: es_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Get cassandra logs
+      ansible.builtin.command:
+        cmd: docker compose logs --tail=100 cassandra
+        chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+      register: cassandra_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Get thehive logs
+      ansible.builtin.command:
+        cmd: docker compose logs --tail=100 thehive
+        chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+      register: thehive_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Get memory status
+      ansible.builtin.command: free -m
+      register: mem_status
+      changed_when: false
+      failed_when: false
+
+    - name: Display failure diagnostics
+      ansible.builtin.debug:
+        msg:
+          - "=== free -m ==="
+          - "{{ mem_status.stdout_lines | default([]) }}"
+          - "=== docker compose ps ==="
+          - "{{ compose_ps.stdout_lines | default([]) }}"
+          - "=== elasticsearch logs (last 100) ==="
+          - "{{ es_logs.stdout_lines | default([]) }}"
+          - "=== cassandra logs (last 100) ==="
+          - "{{ cassandra_logs.stdout_lines | default([]) }}"
+          - "=== thehive logs (last 100) ==="
+          - "{{ thehive_logs.stdout_lines | default([]) }}"
+
+    - name: Fail with compose error
+      ansible.builtin.fail:
+        msg: "TheHive stack failed to become healthy. See diagnostics above."
 
 - name: Wait for TheHive API to become available
   ansible.builtin.uri:
@@ -125,7 +181,7 @@
     method: GET
     status_code: 200
   register: thehive_status
-  retries: 60
+  retries: 30
   delay: 10
   until: thehive_status.status == 200
   failed_when: false
