@@ -1,56 +1,131 @@
 ---
-- name: Download TheHive GPG key
-  ansible.builtin.get_url:
-    url: https://keys.download.strangebee.com/latest/gpg/strangebee.gpg
-    dest: /usr/share/keyrings/strangebee-keyring.gpg
-    mode: "0644"
-
-- name: Download TheHive deb package
-  ansible.builtin.get_url:
-    url: "https://thehive.download.strangebee.com/{{ ludus_thehive_version_branch }}/deb/thehive_{{ ludus_thehive_version }}_all.deb"
-    dest: "/tmp/thehive_{{ ludus_thehive_version }}_all.deb"
-    mode: "0644"
-
-- name: Install TheHive deb package
-  ansible.builtin.apt:
-    deb: "/tmp/thehive_{{ ludus_thehive_version }}_all.deb"
-    state: present
-
-- name: Create TheHive file storage directory
+- name: Ensure install directory exists
   ansible.builtin.file:
-    path: "{{ ludus_thehive_storage_local_path }}"
+    path: "{{ ludus_thehive_install_dir }}"
     state: directory
-    owner: thehive
-    group: thehive
-    mode: "0750"
-  when: ludus_thehive_storage_type == "local"
+    mode: "0755"
 
-- name: Deploy TheHive configuration
+- name: Clone StrangeBee docker repository
+  ansible.builtin.git:
+    repo: "{{ ludus_thehive_git_repo }}"
+    dest: "{{ ludus_thehive_install_dir }}"
+    version: "{{ ludus_thehive_git_version }}"
+    force: false
+    update: false
+
+- name: Generate Elasticsearch password if not provided
+  ansible.builtin.set_fact:
+    ludus_thehive_elasticsearch_password: >-
+      {{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}
+  when: ludus_thehive_elasticsearch_password | length == 0
+
+- name: Generate TheHive play secret if not provided
+  ansible.builtin.set_fact:
+    ludus_thehive_play_secret: >-
+      {{ lookup('ansible.builtin.password', '/dev/null', length=64, chars=['ascii_letters', 'digits']) }}
+  when: ludus_thehive_play_secret | length == 0
+
+- name: Read versions.env from cloned repo
+  ansible.builtin.slurp:
+    src: "{{ ludus_thehive_install_dir }}/versions.env"
+  register: versions_env_content
+
+- name: Deploy .env file
   ansible.builtin.template:
-    src: application.conf.j2
-    dest: /etc/thehive/application.conf
-    owner: thehive
-    group: thehive
+    src: dot.env.j2
+    dest: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/.env"
     mode: "0640"
-    backup: true
-  notify: restart thehive
+  vars:
+    versions_env_body: "{{ versions_env_content.content | b64decode }}"
 
-- name: Enable and start TheHive
-  ansible.builtin.service:
-    name: thehive
-    state: started
-    enabled: true
+- name: Deploy index.conf with Elasticsearch credentials
+  ansible.builtin.template:
+    src: index.conf.j2
+    dest: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/thehive/config/index.conf"
+    mode: "0644"
 
-- name: Flush handlers to restart TheHive if needed
-  ansible.builtin.meta: flush_handlers
+- name: Deploy secret.conf with play secret
+  ansible.builtin.template:
+    src: secret.conf.j2
+    dest: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/thehive/config/secret.conf"
+    mode: "0640"
 
-- name: Wait for TheHive to be ready
+- name: Ensure data directories exist with correct ownership
+  ansible.builtin.file:
+    path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+    recurse: true
+  loop:
+    - cassandra/data
+    - cassandra/logs
+    - elasticsearch/data
+    - elasticsearch/logs
+    - thehive/data/files
+    - thehive/logs
+    - certificates
+    - nginx/certs
+
+- name: Check if TLS certificate already exists
+  ansible.builtin.stat:
+    path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/certificates/server.crt"
+  register: tls_cert
+
+- name: Generate self-signed TLS certificate for nginx
+  ansible.builtin.command:
+    cmd: >-
+      openssl req -x509 -nodes -newkey rsa:2048
+      -keyout certificates/server.key
+      -out certificates/server.crt
+      -days 3650
+      -subj "/CN={{ ludus_thehive_server_name }}"
+    chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+    creates: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/certificates/server.crt"
+  when:
+    - ludus_thehive_enable_nginx
+    - not tls_cert.stat.exists
+
+- name: Create empty ca.pem if missing (required by nginx template)
+  ansible.builtin.file:
+    path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/certificates/ca.pem"
+    state: touch
+    mode: "0644"
+  when: ludus_thehive_enable_nginx
+  changed_when: false
+
+- name: Disable nginx service in compose (when nginx not wanted)
+  ansible.builtin.copy:
+    dest: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/docker-compose.override.yml"
+    content: |
+      services:
+        nginx:
+          profiles:
+            - disabled
+    mode: "0644"
+  when: not ludus_thehive_enable_nginx
+
+- name: Remove compose override when nginx is enabled
+  ansible.builtin.file:
+    path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/docker-compose.override.yml"
+    state: absent
+  when: ludus_thehive_enable_nginx
+
+- name: Start TheHive stack with docker compose
+  ansible.builtin.command:
+    cmd: docker compose up -d
+    chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+  register: compose_up
+  changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout or 'Recreated' in compose_up.stdout"
+
+- name: Wait for TheHive API to become available
   ansible.builtin.uri:
     url: "http://127.0.0.1:{{ ludus_thehive_port }}/api/v1/status/public"
     method: GET
     status_code: 200
   register: thehive_status
-  retries: 30
+  retries: 60
   delay: 10
   until: thehive_status.status == 200
   failed_when: false

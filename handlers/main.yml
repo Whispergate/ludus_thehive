@@ -1,15 +1,5 @@
 ---
-- name: restart cassandra
-  ansible.builtin.service:
-    name: cassandra
-    state: restarted
-
-- name: restart elasticsearch
-  ansible.builtin.service:
-    name: elasticsearch
-    state: restarted
-
-- name: restart thehive
-  ansible.builtin.service:
-    name: thehive
-    state: restarted
+- name: restart thehive stack
+  ansible.builtin.command:
+    cmd: docker compose restart
+    chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"

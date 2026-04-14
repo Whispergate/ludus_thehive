@@ -4,7 +4,7 @@ dependencies: []
 galaxy_info:
   role_name: ludus_thehive
   author: Whispergate
-  description: An Ansible Role that installs TheHive 5 on Debian/Ubuntu with Cassandra, Elasticsearch, and optional MISP/Wazuh/OpenCTI integrations
+  description: An Ansible Role that installs TheHive 5 on Debian/Ubuntu via the official StrangeBee docker-compose stack, with optional MISP/Wazuh/OpenCTI integrations
   company: ""
   license: MIT
   min_ansible_version: "2.10"
@@ -27,4 +27,6 @@ galaxy_info:
     - opencti
     - ludus
 
-collections: []
+collections:
+  - ansible.posix
+  - community.docker

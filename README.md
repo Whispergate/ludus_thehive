@@ -1,96 +1,56 @@
 # Ansible Role: TheHive 5 ([Ludus](https://ludus.cloud))
 
-An Ansible Role that installs [TheHive 5](https://strangebee.com/thehive/) on Debian/Ubuntu hosts with Cassandra, Elasticsearch, and optional integrations for [MISP](https://www.misp-project.org/), [Wazuh](https://wazuh.com/), and [OpenCTI](https://www.opencti.io/).
+An Ansible Role that deploys [TheHive 5](https://strangebee.com/thehive/) on Debian/Ubuntu using the official [StrangeBee docker-compose stack](https://github.com/StrangeBeeCorp/docker). Supports optional integrations for [MISP](https://www.misp-project.org/), [Wazuh](https://wazuh.com/), and [OpenCTI](https://www.opencti.io/).
 
-This role installs and configures a complete standalone TheHive instance including:
-- Java 11 (Amazon Corretto)
-- Apache Cassandra 4.1 (database)
-- Elasticsearch 7.17 (index engine)
-- TheHive 5.4 (incident response platform)
+The role:
+- Installs Docker Engine + Compose plugin
+- Clones the canonical StrangeBee docker repo
+- Generates `.env`, `index.conf`, `secret.conf`, and TLS certificates non-interactively
+- Brings up Cassandra, Elasticsearch, TheHive, and nginx via `docker compose`
+- Waits for TheHive's API to report healthy
 
 ## Requirements
 
-- Debian 11/12 or Ubuntu 20.04/22.04
-- Minimum 4 CPU cores and 8 GB RAM recommended
-- 100 GB disk space minimum
+- Debian 11/12 or Ubuntu 20.04/22.04/24.04
+- **At least 8 GB RAM** (the role will fail fast if less — Cassandra and Elasticsearch each want several GB heap)
+- At least 4 CPUs recommended
+- 100+ GB disk for production use
 
 ## Role Variables
 
-Available variables are listed below, along with default values (see `defaults/main.yml`):
+See `defaults/main.yml` for the full list. Key variables:
 
-### TheHive
+```yaml
+# Minimum RAM the role will allow (in MB)
+ludus_thehive_min_ram_mb: 7168
 
-    # TheHive version
-    ludus_thehive_version: "5.4.5-1"
+# Where to clone the StrangeBee docker repo and run the stack
+ludus_thehive_install_dir: /opt/thehive
 
-    # HTTP port for the web UI
-    ludus_thehive_port: 9000
+# Profile: "prod1-thehive" (standard, ~10GB RAM) or "prod2-thehive" (high-perf, ~25GB RAM)
+ludus_thehive_profile: prod1-thehive
 
-    # Secret key (auto-generated if empty)
-    ludus_thehive_secret: ""
+# Pin the StrangeBee repo to a specific commit for reproducibility
+ludus_thehive_git_version: main
 
-### Cassandra
+# TheHive web UI port (host side)
+ludus_thehive_port: 9000
 
-    ludus_thehive_cassandra_version: "4.1"
-    ludus_thehive_cassandra_listen_address: "127.0.0.1"
-    ludus_thehive_cassandra_cluster_name: "thp"
-    ludus_thehive_cassandra_keyspace: "thehive"
-    ludus_thehive_cassandra_thehive_user: "thehive"
-    ludus_thehive_cassandra_thehive_password: "thehive"
+# Expose nginx TLS reverse proxy on 443
+ludus_thehive_enable_nginx: true
+ludus_thehive_server_name: "thehive.local"
 
-### Elasticsearch
-
-    ludus_thehive_elasticsearch_version: "7.17"
-    ludus_thehive_elasticsearch_host: "127.0.0.1"
-    ludus_thehive_elasticsearch_port: 9200
-    ludus_thehive_elasticsearch_heap_size: "1g"
-
-### File Storage
-
-    # "local" or "s3"
-    ludus_thehive_storage_type: "local"
-    ludus_thehive_storage_local_path: "/opt/thp/thehive/files"
-
-    # S3/MinIO settings (only when storage_type is "s3")
-    ludus_thehive_storage_s3_endpoint: "http://127.0.0.1:9100"
-    ludus_thehive_storage_s3_bucket: "thehive"
-    ludus_thehive_storage_s3_access_key: "minioadmin"
-    ludus_thehive_storage_s3_secret_key: "minioadmin"
-
-### Cortex Integration
-
-    ludus_thehive_cortex_enabled: false
-    ludus_thehive_cortex_url: "http://127.0.0.1:9001"
-    ludus_thehive_cortex_api_key: ""
-
-### MISP Integration
-
-    ludus_thehive_misp_enabled: false
-    ludus_thehive_misp_servers:
-      - name: "MISP"
-        url: "https://misp.example.com"
-        auth_key: "your-misp-api-key"
-        organisation: "default"
-        max_age_days: 7
-        purpose: "ImportAndExport"
-
-### Wazuh Integration
-
-    ludus_thehive_wazuh_enabled: false
-    ludus_thehive_wazuh_alert_level: 6
-    ludus_thehive_wazuh_api_key: ""
-
-### OpenCTI Integration
-
-    ludus_thehive_opencti_enabled: false
-    ludus_thehive_opencti_api_key: ""
+# Auto-generated if empty
+ludus_thehive_elasticsearch_password: ""
+ludus_thehive_play_secret: ""
+```
 
 > [!NOTE]
-> OpenCTI connects to TheHive via the [OpenCTI TheHive connector](https://github.com/OpenCTI-Platform/connectors). Configure the connector on the OpenCTI side using TheHive's URL and an API key.
+> MISP, Cortex, and OpenCTI integrations are enabled in the image by default. Configure actual server connections after first login via **Platform Management > Connectors** in the TheHive UI.
 
 ## Dependencies
 
-None.
+None (Docker is installed by the role itself).
 
 ## Example Playbook
 
@@ -99,12 +59,7 @@ None.
   roles:
     - Whispergate.ludus_thehive
   vars:
-    ludus_thehive_misp_enabled: true
-    ludus_thehive_misp_servers:
-      - name: "MISP"
-        url: "https://10.2.99.50"
-        auth_key: "your-misp-api-key"
-        ws_ssl_verify: false
+    ludus_thehive_server_name: "hive.icsrange.internal"
 ```
 
 ## Example Ludus Range Config
@@ -113,51 +68,45 @@ None.
 ludus:
   - vm_name: "{{ range_id }}-thehive"
     hostname: "{{ range_id }}-thehive"
-    template: debian-12-x64-server-template
-    vlan: 20
-    ip_last_octet: 50
+    template: ubuntu-24.04-x64-server-template
+    vlan: 10
+    ip_last_octet: 4
     ram_gb: 8
     cpus: 4
+    linux: true
+    dns_rewrites:
+      - hive.icsrange.internal
     roles:
       - Whispergate.ludus_thehive
     role_vars:
+      ludus_thehive_server_name: "hive.icsrange.internal"
       ludus_thehive_misp_enabled: true
-      ludus_thehive_misp_servers:
-        - name: "MISP"
-          url: "https://10.2.99.51"
-          auth_key: "your-misp-api-key"
-          ws_ssl_verify: false
-      ludus_thehive_cortex_enabled: true
-      ludus_thehive_cortex_url: "http://10.2.99.52:9001"
-      ludus_thehive_cortex_api_key: "your-cortex-api-key"
 ```
-
-### With Wazuh Integration
-
-If deploying alongside a Wazuh manager, enable the Wazuh integration to forward alerts:
-
-```yaml
-role_vars:
-  ludus_thehive_wazuh_enabled: true
-  ludus_thehive_wazuh_api_key: "your-thehive-api-key"
-  ludus_thehive_wazuh_alert_level: 6
-```
-
-> [!WARNING]
-> The Wazuh integration deploys a script to `/var/ossec/integrations/`. This requires the target host to have Wazuh manager installed. You must also add the integration block to your Wazuh `ossec.conf` manually or via a separate role.
-
-### With OpenCTI
-
-OpenCTI connects to TheHive using its own connector. On the OpenCTI side, configure the `opencti/connector-thehive` Docker container with TheHive's URL and API key. This role sets `ludus_thehive_opencti_enabled` as a flag for documentation purposes.
 
 ## Default Credentials
 
-After installation, TheHive is accessible at `http://<host_ip>:9000` with default credentials:
+After deploy, TheHive is at `http://<host_ip>:9000` (and `https://<host_ip>` if nginx is enabled with a self-signed cert):
+
 - **Username:** `admin@thehive.local`
 - **Password:** `secret`
 
 > [!WARNING]
-> Change the default credentials immediately after first login.
+> Change the default credentials immediately on first login.
+
+## Operating the stack
+
+The stack lives under `{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}` on the host. Standard compose commands work from that directory:
+
+```bash
+cd /opt/thehive/prod1-thehive
+docker compose ps
+docker compose logs -f thehive
+docker compose restart thehive
+```
+
+## Wazuh Integration
+
+Setting `ludus_thehive_wazuh_enabled: true` deploys a Python integration script to `/var/ossec/integrations/` on the same host. This only makes sense if the target is also a Wazuh manager. You still need to add the `<integration>` block to Wazuh's `ossec.conf` manually or via a separate role.
 
 ## License
 

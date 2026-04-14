@@ -3,35 +3,29 @@
   ansible.builtin.assert:
     that:
       - ansible_os_family == "Debian"
-    fail_msg: "This role only supports Debian/Ubuntu systems. Detected: {{ ansible_os_family }}"
+    fail_msg: "This role only supports Debian/Ubuntu. Detected: {{ ansible_os_family }}"
 
-- name: Install prerequisites
-  ansible.builtin.apt:
-    name:
-      - apt-transport-https
-      - ca-certificates
-      - curl
-      - gnupg
-      - software-properties-common
-      - python3-venv
+- name: Validate system has enough RAM
+  ansible.builtin.assert:
+    that:
+      - ansible_memtotal_mb >= ludus_thehive_min_ram_mb
+    fail_msg: >
+      TheHive stack requires at least {{ ludus_thehive_min_ram_mb }} MB of RAM.
+      Detected {{ ansible_memtotal_mb }} MB. Increase ram_gb in your range config.
+
+- name: Set vm.max_map_count for Elasticsearch
+  ansible.posix.sysctl:
+    name: vm.max_map_count
+    value: "262144"
     state: present
-    update_cache: true
+    sysctl_set: true
+    reload: true
 
-- name: Install Java 11 (Amazon Corretto)
-  ansible.builtin.include_tasks: java.yml
+- name: Install Docker and dependencies
+  ansible.builtin.include_tasks: docker_install.yml
 
-- name: Install and configure Cassandra
-  ansible.builtin.include_tasks: cassandra.yml
-
-- name: Install and configure Elasticsearch
-  ansible.builtin.include_tasks: elasticsearch.yml
-
-- name: Install and configure TheHive
+- name: Deploy TheHive stack
   ansible.builtin.include_tasks: thehive.yml
-
-- name: Configure MISP integration
-  ansible.builtin.include_tasks: misp.yml
-  when: ludus_thehive_misp_enabled
 
 - name: Configure Wazuh integration
   ansible.builtin.include_tasks: wazuh.yml
@@ -40,8 +34,11 @@
 - name: Display TheHive access information
   ansible.builtin.debug:
     msg:
-      - "TheHive is available at http://{{ ansible_default_ipv4.address }}:{{ ludus_thehive_port }}"
+      - "TheHive is available at:"
+      - "  http://{{ ansible_default_ipv4.address }}:{{ ludus_thehive_port }}"
+      - "{{ 'and https://' + ansible_default_ipv4.address + ' (nginx)' if ludus_thehive_enable_nginx else '' }}"
       - "Default credentials: admin@thehive.local / secret"
-      - "MISP integration: {{ 'enabled' if ludus_thehive_misp_enabled else 'disabled' }}"
+      - "Change the default password immediately after first login."
+      - "MISP integration: {{ 'enabled (configure in UI)' if ludus_thehive_misp_enabled else 'disabled' }}"
       - "Wazuh integration: {{ 'enabled' if ludus_thehive_wazuh_enabled else 'disabled' }}"
       - "OpenCTI integration: {{ 'enabled (configure connector on OpenCTI side)' if ludus_thehive_opencti_enabled else 'disabled' }}"
