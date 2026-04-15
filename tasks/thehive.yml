@@ -1,20 +1,4 @@
 ---
-- name: Create thehive group
-  ansible.builtin.group:
-    name: thehive
-    gid: "{{ ludus_thehive_run_gid }}"
-    system: true
-
-- name: Create thehive user
-  ansible.builtin.user:
-    name: thehive
-    uid: "{{ ludus_thehive_run_uid }}"
-    group: thehive
-    system: true
-    shell: /usr/sbin/nologin
-    home: "{{ ludus_thehive_install_dir }}"
-    create_home: false
-
 - name: Ensure install directory exists
   ansible.builtin.file:
     path: "{{ ludus_thehive_install_dir }}"
