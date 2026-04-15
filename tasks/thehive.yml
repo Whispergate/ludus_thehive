@@ -162,6 +162,15 @@
       changed_when: false
       failed_when: false
 
+    - name: Get nginx logs
+      ansible.builtin.command:
+        cmd: docker compose logs --tail=50 nginx
+        chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
+      register: nginx_logs
+      changed_when: false
+      failed_when: false
+      when: ludus_thehive_enable_nginx
+
     - name: Get memory status
       ansible.builtin.command: free -m
       register: mem_status

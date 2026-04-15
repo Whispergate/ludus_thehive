@@ -30,8 +30,10 @@ ludus_thehive_git_version: main
 # Port the TheHive web UI is exposed on (host side, bound by the thehive container)
 ludus_thehive_port: 9000
 
-# Expose nginx TLS reverse proxy on 443 (set false to skip nginx service entirely)
-ludus_thehive_enable_nginx: true
+# Expose nginx TLS reverse proxy on 443. Disabled by default for Ludus ranges
+# since TheHive is directly reachable on port 9000 and nginx adds cert-management
+# complexity. Set true if you need TLS termination.
+ludus_thehive_enable_nginx: false
 ludus_thehive_server_name: "thehive.local"
 
 # ========================
