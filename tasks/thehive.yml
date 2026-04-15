@@ -1,4 +1,20 @@
 ---
+- name: Create thehive group
+  ansible.builtin.group:
+    name: thehive
+    gid: "{{ ludus_thehive_run_gid }}"
+    system: true
+
+- name: Create thehive user
+  ansible.builtin.user:
+    name: thehive
+    uid: "{{ ludus_thehive_run_uid }}"
+    group: thehive
+    system: true
+    shell: /usr/sbin/nologin
+    home: "{{ ludus_thehive_install_dir }}"
+    create_home: false
+
 - name: Ensure install directory exists
   ansible.builtin.file:
     path: "{{ ludus_thehive_install_dir }}"
@@ -50,14 +66,11 @@
     dest: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/thehive/config/secret.conf"
     mode: "0640"
 
-- name: Ensure data directories exist with correct ownership
+- name: Ensure data directories exist
   ansible.builtin.file:
     path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/{{ item }}"
     state: directory
-    owner: root
-    group: root
     mode: "0755"
-    recurse: true
   loop:
     - cassandra/data
     - cassandra/logs
@@ -67,6 +80,20 @@
     - thehive/logs
     - certificates
     - nginx/certs
+
+- name: Chown all stack directories to thehive user
+  ansible.builtin.file:
+    path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/{{ item }}"
+    state: directory
+    owner: "{{ ludus_thehive_run_uid }}"
+    group: "{{ ludus_thehive_run_gid }}"
+    recurse: true
+  loop:
+    - cassandra
+    - elasticsearch
+    - thehive
+    - certificates
+    - nginx
 
 - name: Check if TLS certificate already exists
   ansible.builtin.stat:

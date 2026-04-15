@@ -9,6 +9,12 @@ ludus_thehive_min_ram_mb: 7168
 # Host directory where the StrangeBee docker repo is cloned and stack is run
 ludus_thehive_install_dir: /opt/thehive
 
+# Unprivileged UID/GID the containers run as (Elasticsearch refuses to run
+# as UID 0). The role creates a "thehive" system user with this UID/GID and
+# chowns all data directories to it.
+ludus_thehive_run_uid: 1000
+ludus_thehive_run_gid: 1000
+
 # Which StrangeBee profile to deploy: "prod1-thehive" (standard) or "prod2-thehive" (high-perf)
 ludus_thehive_profile: prod1-thehive
 
