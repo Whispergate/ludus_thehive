@@ -113,6 +113,14 @@
     mode: "0644"
   when: ludus_thehive_small_resources
 
+- name: Stop and remove nginx container when disabled
+  ansible.builtin.shell:
+    cmd: |
+      docker stop nginx 2>/dev/null || true
+      docker rm nginx 2>/dev/null || true
+  changed_when: false
+  when: not ludus_thehive_enable_nginx
+
 - name: Remove compose override when small_resources is disabled
   ansible.builtin.file:
     path: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/docker-compose.override.yml"
@@ -121,7 +129,7 @@
 
 - name: Start TheHive stack with docker compose
   ansible.builtin.command:
-    cmd: docker compose up -d --wait --wait-timeout 600
+    cmd: docker compose up -d --force-recreate --wait --wait-timeout 900
     chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
   register: compose_up
   changed_when: "'Started' in compose_up.stdout or 'Created' in compose_up.stdout or 'Recreated' in compose_up.stdout"
@@ -138,27 +146,34 @@
       changed_when: false
       failed_when: false
 
-    - name: Get elasticsearch logs
-      ansible.builtin.command:
-        cmd: docker compose logs --tail=100 elasticsearch
-        chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
-      register: es_logs
-      changed_when: false
-      failed_when: false
-
     - name: Get cassandra logs
       ansible.builtin.command:
-        cmd: docker compose logs --tail=100 cassandra
+        cmd: docker compose logs --tail=30 cassandra
         chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
       register: cassandra_logs
       changed_when: false
       failed_when: false
+      # truncate to last 30 lines since we mostly care about thehive
 
-    - name: Get thehive logs
+    - name: Get thehive container stdout logs
       ansible.builtin.command:
         cmd: docker compose logs --tail=100 thehive
         chdir: "{{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}"
       register: thehive_logs
+      changed_when: false
+      failed_when: false
+
+    - name: Read TheHive application.log (where TheHive actually logs)
+      ansible.builtin.shell:
+        cmd: tail -n 200 {{ ludus_thehive_install_dir }}/{{ ludus_thehive_profile }}/thehive/logs/application.log 2>/dev/null || echo "application.log not found"
+      register: thehive_app_log
+      changed_when: false
+      failed_when: false
+
+    - name: Inspect thehive container for exit reason
+      ansible.builtin.shell:
+        cmd: docker inspect thehive 2>/dev/null | jq '.[0].State' 2>/dev/null || docker inspect thehive 2>/dev/null | grep -E '"(Status|ExitCode|Error|OOMKilled|StartedAt|FinishedAt)"' || echo "thehive container not found"
+      register: thehive_inspect
       changed_when: false
       failed_when: false
 
@@ -184,12 +199,14 @@
           - "{{ mem_status.stdout_lines | default([]) }}"
           - "=== docker compose ps ==="
           - "{{ compose_ps.stdout_lines | default([]) }}"
-          - "=== elasticsearch logs (last 100) ==="
-          - "{{ es_logs.stdout_lines | default([]) }}"
+          - "=== docker inspect thehive ==="
+          - "{{ thehive_inspect.stdout | default('') }}"
+          - "=== thehive application.log (last 200) ==="
+          - "{{ thehive_app_log.stdout_lines | default([]) }}"
+          - "=== thehive container stdout ==="
+          - "{{ thehive_logs.stdout_lines | default([]) }}"
           - "=== cassandra logs (last 100) ==="
           - "{{ cassandra_logs.stdout_lines | default([]) }}"
-          - "=== thehive logs (last 100) ==="
-          - "{{ thehive_logs.stdout_lines | default([]) }}"
 
     - name: Fail with compose error
       ansible.builtin.fail:

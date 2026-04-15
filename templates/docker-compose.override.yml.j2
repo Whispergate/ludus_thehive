@@ -42,11 +42,11 @@ services:
           -XX:MaxMetaspaceSize=256m
           -XX:ReservedCodeCacheSize=256m
     healthcheck:
-      test: ["CMD-SHELL", "curl -s -f http://thehive:9000/api/v1/status/public || exit 1"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/api/v1/status/public"]
       start_period: 300s
       interval: 15s
       timeout: 10s
-      retries: 10
+      retries: 20
     deploy:
       resources:
         limits:
