@@ -45,15 +45,17 @@ ludus_thehive_server_name: "thehive.local"
 
 ludus_thehive_small_resources: true
 
-ludus_thehive_cassandra_heap_size: "1500M"
+ludus_thehive_cassandra_heap_size: "2G"
 ludus_thehive_cassandra_heap_newsize: "256M"
-ludus_thehive_cassandra_memory_limit: "2G"
+ludus_thehive_cassandra_memory_limit: "3G"
 
-ludus_thehive_elasticsearch_heap: "1500m"
-ludus_thehive_elasticsearch_memory_limit: "2G"
+ludus_thehive_elasticsearch_heap: "2g"
+ludus_thehive_elasticsearch_memory_limit: "3G"
 
-ludus_thehive_java_heap: "1500M"
-ludus_thehive_memory_limit: "2G"
+# TheHive heap should leave ~1.5GB headroom in the container limit for
+# metaspace + code cache + direct memory + JIT buffers + threads
+ludus_thehive_java_heap: "2500M"
+ludus_thehive_memory_limit: "4G"
 
 # ========================
 # Credentials
