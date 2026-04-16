@@ -20,7 +20,7 @@ ludus_thehive_profile: prod1-thehive
 
 # Git revision of StrangeBeeCorp/docker to pin (branch, tag, or commit SHA).
 # Use "main" to always get latest; pin a commit for reproducibility.
-ludus_thehive_git_repo: https://github.com/StrangeBeeCorp/docker.git
+ludus_thehive_git_repo: "https://github.com/StrangeBeeCorp/docker.git"
 ludus_thehive_git_version: main
 
 # ========================
@@ -48,14 +48,20 @@ ludus_thehive_small_resources: true
 ludus_thehive_cassandra_heap_size: "2G"
 ludus_thehive_cassandra_heap_newsize: "256M"
 ludus_thehive_cassandra_memory_limit: "3G"
+ludus_thehive_cassandra_memory_swap_limit: "3G"
 
 ludus_thehive_elasticsearch_heap: "2g"
 ludus_thehive_elasticsearch_memory_limit: "3G"
+ludus_thehive_elasticsearch_memory_swap_limit: "3G"
 
 # TheHive heap should leave ~1.5GB headroom in the container limit for
 # metaspace + code cache + direct memory + JIT buffers + threads
-ludus_thehive_java_heap: "2500M"
+ludus_thehive_java_xms: "2500m"
+ludus_thehive_java_xmx: "2500m"
+ludus_thehive_java_metaspace: "512m"
+ludus_thehive_java_code_cache: "256m"
 ludus_thehive_memory_limit: "4G"
+ludus_thehive_memory_swap_limit: "4G"
 
 # ========================
 # Credentials
