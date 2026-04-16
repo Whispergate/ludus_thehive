@@ -12,8 +12,10 @@ services:
       - CASSANDRA_NUM_TOKENS=4
       - HEAP_NEWSIZE={{ ludus_thehive_cassandra_heap_newsize }}
       - MAX_HEAP_SIZE={{ ludus_thehive_cassandra_heap_size }}
-    mem_limit: {{ ludus_thehive_cassandra_memory_limit }}
-    memswap_limit: {{ ludus_thehive_cassandra_memory_swap_limit | default(ludus_thehive_cassandra_memory_limit) }}
+    deploy:
+      resources:
+        limits:
+          memory: {{ ludus_thehive_cassandra_memory_limit }}
 
   elasticsearch:
     environment:
@@ -26,8 +28,10 @@ services:
       - xpack.security.enabled=true
       - ELASTIC_PASSWORD=${elasticsearch_password}
       - ES_JAVA_OPTS=-Xms{{ ludus_thehive_elasticsearch_heap }} -Xmx{{ ludus_thehive_elasticsearch_heap }}
-    mem_limit: {{ ludus_thehive_elasticsearch_memory_limit }}
-    memswap_limit: {{ ludus_thehive_elasticsearch_memory_swap_limit | default(ludus_thehive_elasticsearch_memory_limit) }}
+    deploy:
+      resources:
+        limits:
+          memory: {{ ludus_thehive_elasticsearch_memory_limit }}
 
   thehive:
     environment:
@@ -43,8 +47,10 @@ services:
       interval: 15s
       timeout: 10s
       retries: 20
-    mem_limit: {{ ludus_thehive_memory_limit }}
-    memswap_limit: {{ ludus_thehive_memory_swap_limit | default(ludus_thehive_memory_limit) }}
+    deploy:
+      resources:
+        limits:
+          memory: {{ ludus_thehive_memory_limit }}
 
 {% if not ludus_thehive_enable_nginx %}
   nginx:
