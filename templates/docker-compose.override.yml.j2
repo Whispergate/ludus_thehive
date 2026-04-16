@@ -1,9 +1,8 @@
 ---
 # Managed by Ansible
 # Resource overrides for Ludus TheHive stack.
-# This file is intended for plain `docker compose up` on a single host.
-# For non-Swarm Compose deployments, mem_limit/memswap_limit are the important
-# settings; deploy.resources is often ignored outside Swarm.
+# Shrinks heap and container memory limits so the stack fits on the VM.
+# Remove ludus_thehive_small_resources from your role_vars to disable.
 
 services:
   cassandra:
