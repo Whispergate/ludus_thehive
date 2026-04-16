@@ -1,6 +1,9 @@
-# Resource override for smaller Ludus VMs - managed by Ansible
-# Shrinks heap and container memory limits so the stack fits on an 8 GB VM.
-# Remove ludus_thehive_small_resources from your role_vars to disable.
+---
+# Managed by Ansible
+# Resource overrides for Ludus TheHive stack.
+# This file is intended for plain `docker compose up` on a single host.
+# For non-Swarm Compose deployments, mem_limit/memswap_limit are the important
+# settings; deploy.resources is often ignored outside Swarm.
 
 services:
   cassandra:
@@ -10,11 +13,8 @@ services:
       - CASSANDRA_NUM_TOKENS=4
       - HEAP_NEWSIZE={{ ludus_thehive_cassandra_heap_newsize }}
       - MAX_HEAP_SIZE={{ ludus_thehive_cassandra_heap_size }}
-    deploy:
-      resources:
-        limits:
-          memory: {{ ludus_thehive_cassandra_memory_limit }}
-    memswap_limit: {{ ludus_thehive_cassandra_memory_limit }}
+    mem_limit: {{ ludus_thehive_cassandra_memory_limit }}
+    memswap_limit: {{ ludus_thehive_cassandra_memory_swap_limit | default(ludus_thehive_cassandra_memory_limit) }}
 
   elasticsearch:
     environment:
@@ -27,33 +27,27 @@ services:
       - xpack.security.enabled=true
       - ELASTIC_PASSWORD=${elasticsearch_password}
       - ES_JAVA_OPTS=-Xms{{ ludus_thehive_elasticsearch_heap }} -Xmx{{ ludus_thehive_elasticsearch_heap }}
-    deploy:
-      resources:
-        limits:
-          memory: {{ ludus_thehive_elasticsearch_memory_limit }}
-    memswap_limit: {{ ludus_thehive_elasticsearch_memory_limit }}
+    mem_limit: {{ ludus_thehive_elasticsearch_memory_limit }}
+    memswap_limit: {{ ludus_thehive_elasticsearch_memory_swap_limit | default(ludus_thehive_elasticsearch_memory_limit) }}
 
   thehive:
     environment:
       - |
         JAVA_OPTS=
-          -Xms{{ ludus_thehive_java_heap }}
-          -Xmx{{ ludus_thehive_java_heap }}
-          -XX:MaxMetaspaceSize=256m
-          -XX:ReservedCodeCacheSize=256m
+          -Xms{{ ludus_thehive_java_xms }}
+          -Xmx{{ ludus_thehive_java_xmx }}
+          -XX:MaxMetaspaceSize={{ ludus_thehive_java_metaspace }}
+          -XX:ReservedCodeCacheSize={{ ludus_thehive_java_code_cache }}
     healthcheck:
       test: ["CMD", "curl", "-sf", "http://localhost:9000/api/v1/status/public"]
       start_period: 300s
       interval: 15s
       timeout: 10s
       retries: 20
-    deploy:
-      resources:
-        limits:
-          memory: {{ ludus_thehive_memory_limit }}
-    memswap_limit: {{ ludus_thehive_memory_limit }}
-{% if not ludus_thehive_enable_nginx %}
+    mem_limit: {{ ludus_thehive_memory_limit }}
+    memswap_limit: {{ ludus_thehive_memory_swap_limit | default(ludus_thehive_memory_limit) }}
 
+{% if not ludus_thehive_enable_nginx %}
   nginx:
     profiles:
       - disabled
